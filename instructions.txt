@@ -127,8 +127,18 @@ Step 2: Install and link the desired toolchain (e.g., TBB, CilkPlus, ...).
 Step 3: Test the provided serial k-means solution.
   The provided application loads the whole dataset at the beginning of the execution.
   Once compiled (and the binary "kmeans" is produced), I use the following command line:
-  		cat datasets/XXXX.txt | ./kmeans
+  		cat datasets/dataset1.txt | ./kmeans
   Feel free to change it if you prefer another way.
 
 
 Step 4: Implement a parallel version of the given serial k-means solution.
+
+
+
+cat datasets/Raisin_Dataset.txt | ./kmeans
+
+cat datasets/red_wine.txt | ./kmeans
+
+cat datasets/concrete.txt | ./kmeans
+
+cat datasets/tai_bank.txt | ./kmeans
