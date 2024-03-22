@@ -22,10 +22,6 @@
 #include <map>
 using namespace std;
 
-vector<std::mutex*> clusters_lock;
-std::mutex distances_mutex;
-
-
 
 class Point
 {
@@ -91,10 +87,6 @@ private:
 	int id_cluster;
 	vector<double> central_values;
 	vector<Point> points;
-	//vector<tbb::spin_mutex*> clusters_lock;
-
-	
-
 public:
 	Cluster(int id_cluster, Point point)
 	{
@@ -109,7 +101,6 @@ public:
 		// Then add the point to the vector of all points
 		points.push_back(point);
 
-    	//clusters_lock.push_back(new tbb::spin_mutex());
 	}
 
 	void addPoint(Point point)
@@ -176,13 +167,10 @@ private:
 
 		int id_cluster_center = 0;
 
-		sum = tbb::parallel_reduce(
-			tbb::blocked_range<int>(0, total_values), 0.0, [&](tbb::blocked_range<int> r, double sum2) {
-				for (int i=r.begin(); i<r.end(); ++i) {
-					sum2 += pow(clusters[0].getCentralValue(i) - point.getValue(i), 2.0);
-				}
-				return sum2;
-			}, std::plus<double>() );
+		for(int i = 0; i < total_values; i++)
+		{
+			sum += pow(clusters[0].getCentralValue(i) - point.getValue(i), 2.0);
+		}
 
 		// Square root of the sum of distances
 		min_dist = sqrt(sum);
@@ -214,7 +202,7 @@ private:
     	return min_index;
 	}
 	
-	// Change Sunlab Machine: ssh ariel
+	// Change Sunlab Machine: ssh (name)
 	// Return ID of nearest center (uses euclidean distance)
 	int getIDNearestCenter(Point point)
 	{	
@@ -226,7 +214,7 @@ private:
 		
 
 		// Accumulate all the squared euclidean distances between the values and the first cluster
-		// One iteration per point
+		//One iteration per point
 		for(int i = 0; i < total_values; i++)
 		{
 			sum += pow(clusters[0].getCentralValue(i) - point.getValue(i), 2.0);
@@ -276,9 +264,6 @@ public:
 		// Total number of iterations allowed
 		this->max_iterations = max_iterations;
 
-		for(int i=0; i<K; i++){
-			clusters_lock.push_back(new std::mutex());
-		}
 	}
 
 	// Generate a random integer
@@ -305,7 +290,7 @@ public:
 		
 		vector<int> prohibited_indexes;
 		vector<int> indices;
-
+		
 		// ------------------------------------- Good cluster centers ------------------------------------- //
 
 		// Raisins 
@@ -321,7 +306,7 @@ public:
 		// Red Wine
 		//std::vector<int> good = {391, 173, 886};
 		//std::vector<int> good = {1074, 981, 1289, 361};
-		//std::vector<int> good = {1063, 407, 514, 154};
+		//std::vector<int> good = {1063, 407, 514, 154, 361};
 		//std::vector<int> good = {1399, 192, 861, 1063, 1452, 881};
 		//std::vector<int> good = {154, 918, 596, 81, 1471, 1138, 1532};
 		//std::vector<int> good = {1070, 172, 159, 828, 506, 923, 571, 885, 1154, 1444};
@@ -338,7 +323,7 @@ public:
 		//std::vector<int> good = {198505, 251581, 282541, 121544, 182451, 40306, 131317, 218715, 70986, 136454, 302799, 19219, 58509, 50956, 248408};
 
 		// Bank
-		//std::vector<int> good = {1008, 5196, 3037};
+		std::vector<int> good = {1008, 5196, 3037};
 		//std::vector<int> good = {5383, 5069, 2483, 2487};
 		//std::vector<int> good = {5037, 3246, 2778, 3510, 3001};
 		//std::vector<int> good = {564, 5902, 5023, 5864, 5758, 1177};
@@ -348,185 +333,135 @@ public:
 
 		// ------------------------------------------------------------------------------------------------ //
 		
-		// int good_point;
-		// for(int i=0; i < K; ++i){
-		// 	good_point = good[i];
-		// 	points[good_point].setCluster(i);
-		// 	Cluster cluster(i, points[good_point]);
-		// 	clusters.push_back(cluster);
-		// 	indices.push_back(good_point);
-		// }
-
-		// Choose random cluster centers
-		for(int i = 0; i < K; i++)
-		{
-			while(true)
-			{
-				int index_point = rand_int(0, total_points) % total_points;
-
-				if(find(prohibited_indexes.begin(), prohibited_indexes.end(), index_point) == prohibited_indexes.end())
-				{
-					prohibited_indexes.push_back(index_point);
-					points[index_point].setCluster(i);
-					Cluster cluster(i, points[index_point]);
-					clusters.push_back(cluster);
-					indices.push_back(index_point);
-					break;
-				}
-			}
+		int good_point;
+		for(int i=0; i < K; ++i){
+			good_point = good[i];
+			points[good_point].setCluster(i);
+			Cluster cluster(i, points[good_point]);
+			clusters.push_back(cluster);
+			indices.push_back(good_point);
 		}
 
+		// Choose random cluster centers
+		// for(int i = 0; i < K; i++)
+		// {
+		// 	while(true)
+		// 	{
+		// 		int index_point = rand_int(0, total_points) % total_points;
+
+		// 		if(find(prohibited_indexes.begin(), prohibited_indexes.end(), index_point) == prohibited_indexes.end())
+		// 		{
+		// 			prohibited_indexes.push_back(index_point);
+		// 			points[index_point].setCluster(i);
+
+		// 			Cluster cluster(i, points[index_point]);
+		// 			clusters.push_back(cluster);
+		// 			break;
+		// 		}
+		// 	}
+			
+		// }
+
         auto end_phase1 = chrono::high_resolution_clock::now();
+
 		auto begin_first = chrono::high_resolution_clock::now();
 		auto begin_second = chrono::high_resolution_clock::now();
 		auto end_first = chrono::high_resolution_clock::now();
 		auto end_second = chrono::high_resolution_clock::now();
 
-		
-        
 		int iter = 1;
+		std::vector<std::mutex> sums_mutexes(K);
+		std::mutex tot_points_mutex;
 
 		while(true)
 		{
 			// Tracks if any point has moved to a different cluster
 			// Once this remains true, the algorithm has converged and we're done
 			bool done = true;
+			
 
-			// begin_first = chrono::high_resolution_clock::now();
+			// -------------------- Parallel Implementation -------------------- // 
 
-			// // Associates each point to the nearest center
+			begin_second = chrono::high_resolution_clock::now();
+
+			std::vector<int> tot_points(K, 0);
+			
+			// This contains a vector for each cluster
+			// Each inner vector will hold the sums for each value of a cluster
+			std::vector<std::vector<double>> sums(K, std::vector<double>(total_values));
+
+			tbb::parallel_for(tbb::blocked_range<int>(0, total_points), [&](const tbb::blocked_range<int>& r) {
+					
+					for (int i = r.begin(); i != r.end(); ++i) {
+						
+						// The ID of the cluster the point is assigned to
+						int id_old_cluster = points[i].getCluster();
+
+						// Find the closest centroid
+						int id_nearest_center = getIDNearestCenter(points[i]);
+
+						// If the current center isn't the closest, change it
+						if(id_old_cluster != id_nearest_center)
+						{
+							// Assign point to the new closest
+							points[i].setCluster(id_nearest_center);
+
+							// Keep iterating since we haven't converged
+							done = false;
+						}
+
+						sums_mutexes[id_nearest_center].lock();
+						for (int k = 0; k < total_values; k++) {
+							sums[id_nearest_center][k] += points[i].getValue(k);
+						}
+						sums_mutexes[id_nearest_center].unlock();
+
+						// Protect access to tot_points vector
+						tot_points_mutex.lock();
+						tot_points[id_nearest_center] += 1;
+						tot_points_mutex.unlock();
+						
+					}
+        	});
+			
 			// for(int i = 0; i < total_points; i++)
 			// {	
-			// 	// The ID of the cluster the point is currently assigned to
+			// 	// The ID of the cluster the point is assigned to
 			// 	int id_old_cluster = points[i].getCluster();
 
-			// 	// Find the closest cluster center
-			// 	int id_nearest_center = getIDNearestCenterPar(points[i]);
+			// 	// Find the closest centroid
+			// 	int id_nearest_center = getIDNearestCenter(points[i]);
 
 			// 	// If the current center isn't the closest, change it
 			// 	if(id_old_cluster != id_nearest_center)
 			// 	{
-			// 		// Remove the point from its current cluster first
-			// 		if(id_old_cluster != -1){
-			// 			clusters[id_old_cluster].removePoint(points[i].getID());
-			// 		}
-
-			// 		// Now make its assigned cluster the new one and add it 
+			// 		// Assign point to the new closest
 			// 		points[i].setCluster(id_nearest_center);
-			// 		clusters[id_nearest_center].addPoint(points[i]);
 
-			// 		// Since we moved a point, convergence is not done and we must keep going
+			// 		// Keep iterating since we haven't converged
 			// 		done = false;
 			// 	}
-			// }
 
-			// end_first = chrono::high_resolution_clock::now();
-
-			// begin_second = chrono::high_resolution_clock::now();
-
-			// // Recalculating the center of each cluster
-			// for(int i = 0; i < K; i++)
-			// {
-			// 	// Iterate over each value within the cluster
-			// 	for(int j = 0; j < total_values; j++)
-			// 	{	
-			// 		// Get the total number of points within the current cluster
-			// 		int total_points_cluster = clusters[i].getTotalPoints();
-			// 		double sum = 0.0;
-
-			// 		if(total_points_cluster > 0)
-			// 		{
-			// 			// For every point, sum up their values
-			// 			for(int p = 0; p < total_points_cluster; p++){
-			// 				sum += clusters[i].getPoint(p).getValue(j);
-			// 			}
-			// 			// Once you get the sum, set the cluster center coord to the average of all points
-			// 			clusters[i].setCentralValue(j, sum / total_points_cluster);
-			// 		}
+			// 	// Add the current point's values to the corresponding cluster vector
+			// 	for(int k=0; k<total_values; k++){
+			// 		sums[id_nearest_center][k] += points[i].getValue(k);
 			// 	}
+
+			// 	// Keep track of how many points are in each cluster
+			// 	tot_points[id_nearest_center] += 1;
 			// }
-			// end_second = chrono::high_resolution_clock::now();
 
-
-			// -------------------- Parallel Implementation -------------------- // 
-
-			begin_first = chrono::high_resolution_clock::now();
-
-			tbb::parallel_for(tbb::blocked_range<int>(0, total_points), [&](const tbb::blocked_range<int>& r) {
-				
-				// Associates each point to the nearest center
-				for (int i = r.begin(); i != r.end(); ++i) {
-					
-					// The ID of the cluster the point is currently assigned to
-					int id_old_cluster = points[i].getCluster();
-					
-					//auto begin_par = chrono::high_resolution_clock::now();
-
-					// Find the closest cluster center
-					int id_nearest_center = getIDNearestCenterPar(points[i]);
-
-					//auto end_par = chrono::high_resolution_clock::now();
-
-					//cout << "ID Nearest = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_par-begin_par).count()<<"\n";
-
-					// If the current center isn't the closest, change it
-					if (id_old_cluster != id_nearest_center) {
-
-						// Remove the point from its current cluster first
-						if (id_old_cluster != -1) {
-							
-							clusters_lock[id_old_cluster] -> lock();
-							
-							clusters[id_old_cluster].removePoint(points[i].getID());
-
-							clusters_lock[id_old_cluster] -> unlock();
-						}
-
-						clusters_lock[id_nearest_center] -> lock();
-
-						points[i].setCluster(id_nearest_center);
-						clusters[id_nearest_center].addPoint(points[i]);
-
-						clusters_lock[id_nearest_center] -> unlock();
-
-						// Since we moved a point, convergence is not done and we must keep going
-						done = false; 
-					}
+			// Loop over all clusters
+			for (int i=0; i<K; ++i) {
+				// Loop over all vals
+				for(int j = 0; j < total_values; j++){	
+					clusters[i].setCentralValue(j, sums[i][j] / tot_points[i]);
 				}
-			});
+			}
 
-			end_first = chrono::high_resolution_clock::now();
-
-			begin_second = chrono::high_resolution_clock::now();
-			tbb::parallel_for(tbb::blocked_range<int>(0, K), [&](const tbb::blocked_range<int>& r) {
-					
-					for (int i = r.begin(); i != r.end(); ++i) {
-
-						// Iterate over each value within the cluster
-						for (int j = 0; j < total_values; j++) {
-							
-							// Get the total number of points within the current cluster
-							int total_points_cluster = clusters[i].getTotalPoints();
-							double sum = 0.0;
-
-							if (total_points_cluster > 0) {
-
-								sum = tbb::parallel_reduce(
-									tbb::blocked_range<int>(0, total_points_cluster), 0.0, [&](tbb::blocked_range<int> r, double sum2) {
-										for (int p=r.begin(); p<r.end(); ++p) {
-											sum2 += clusters[i].getPoint(p).getValue(j);
-										}
-										return sum2;
-								}, std::plus<double>() );
-
-								// Once you get the sum, set the cluster center coord to the average of all points
-								clusters[i].setCentralValue(j, sum / total_points_cluster);
-							}
-						}
-					}
-        	});
 
 			end_second = chrono::high_resolution_clock::now();
+
 
 			// Exit if we hit a terminating condition
 			if(done == true || iter >= max_iterations)
@@ -535,8 +470,6 @@ public:
 				break;
 			}
 			iter++;
-
-			
 		}
 		
         auto end = chrono::high_resolution_clock::now();
@@ -544,32 +477,8 @@ public:
 		// Shows elements of clusters
 		for(int i = 0; i < K; i++)
 		{
-			// Get all the points in the current cluster
-			int total_points_cluster =  clusters[i].getTotalPoints();
-
-			// Print cluster ID
-			cout << "Cluster " << clusters[i].getID() + 1 << endl;
-
-			// Loop over every point
-			for(int j = 0; j < total_points_cluster; j++)
-			{	
-				// Print the point IDs
-				cout << "Point " << clusters[i].getPoint(j).getID() + 1 << ": ";
-
-				// Print the points' values
-				for(int p = 0; p < total_values; p++){
-					cout << clusters[i].getPoint(j).getValue(p) << " ";
-				}
-				// Get the names of the points
-				string point_name = clusters[i].getPoint(j).getName();
-
-				if(point_name != "")
-					cout << "- " << point_name;
-
-				cout << endl;
-			}
-
-			// Print value of all centers
+	
+			//  Print value of all centers
 			cout << "Cluster values: ";
 			for(int j = 0; j < total_values; j++){
 				cout << clusters[i].getCentralValue(j) << " ";
@@ -581,11 +490,7 @@ public:
             
             cout << "TIME PHASE 1 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_phase1-begin).count()<<"\n";
             
-            cout << "TIME PHASE 2 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end-end_phase1).count()<<"\n";
-
-			cout << "Associate points to the nearest cluster = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_first-begin_first).count()<<"\n";
-
-			cout << "Recalculating centers = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_second-begin_second).count()<<"\n";
+            cout << "TIME PHASE 2 = "<<std::chrono::duration_cast<std::chrono::microseconds>(end_second-begin_second).count()<<"\n";
 
 		}
 	}
